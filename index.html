@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图论绘制网站</title>
+    <!-- 引入 vis.js 的 CSS 文件 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css" />
+    <!-- 引入 Google Fonts 的 Indie Flower 字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        #input-container {
+            width: 30%;
+            padding: 40px;
+            box-sizing: border-box;
+            background-color: #f4f4f4;
+        }
+
+        #input {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        #button-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #button-container button {
+            margin-bottom: 20px;
+            padding: 15px;
+            font-size: 18px;
+        }
+
+        #graph-container {
+            width: 70%;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 左侧输入区域 -->
+    <div id="input-container">
+        <label>Node Count: </label>
+        <input type="number" id="node-count" value="6" />
+        <br />
+        <label>Graph Data: </label>
+        <textarea id="input" placeholder="输入图的边信息，每行格式：节点1 节点2，例如：1 2"></textarea>
+        <div id="button-container">
+            <button id="draw-undirected-graph">Undirected</button>
+            <button id="draw-directed-graph">Directed</button>
+        </div>
+    </div>
+    <!-- 右侧绘图区域 -->
+    <div id="graph-container"></div>
+
+    <!-- 引入 vis.js 的 JavaScript 文件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.getElementById('input');
+            const nodeCountInput = document.getElementById('node-count');
+            const drawDirectedButton = document.getElementById('draw-directed-graph');
+            const drawUndirectedButton = document.getElementById('draw-undirected-graph');
+            const graphContainer = document.getElementById('graph-container');
+
+            let network;
+
+            const drawGraph = (isDirected) => {
+                const nodeCount = parseInt(nodeCountInput.value);
+                const inputText = input.value;
+                const lines = inputText.trim().split('\n');
+
+                const nodes = [];
+                const edges = [];
+                const nodeSet = new Set();
+
+                // 根据节点数量生成等多边形布局
+                const radius = 150; // 等多边形外接圆半径
+                const centerX = 300;
+                const centerY = 300;
+                for (let i = 0; i < nodeCount; i++) {
+                    const angle = (2 * Math.PI * i) / nodeCount;
+                    const x = centerX + radius * Math.cos(angle);
+                    const y = centerY + radius * Math.sin(angle);
+                    nodes.push({
+                        id: i,
+                        label: i.toString(),
+                        shape: 'circle',
+                        color: {
+                            border: 'black',
+                            background: 'white',
+                            highlight: {
+                                border: 'black',
+                                background: 'white'
+                            }
+                        },
+                        font: {
+                            color: 'black',
+                            size: 24,
+                            face: 'Indie Flower, cursive',
+                            align: 'center',
+                            vadjust: 0,
+                            multi: false,
+                            bold: {
+                                color: 'black',
+                                size: 24,
+                                face: 'Indie Flower, cursive'
+                            },
+                            render: function (ctx, x, y, label) {
+                                ctx.font = '24px Indie Flower, cursive';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillStyle = 'black';
+                                ctx.fillText(label, x, y);
+                            }
+                        },
+                        borderWidth: 2,
+                        size: 30,
+                        x: x,
+                        y: y
+                    });
+                    nodeSet.add(i);
+                }
+
+                lines.forEach(line => {
+                    const [from, to] = line.trim().split(' ');
+                    if (from && to) {
+                        const fromId = parseInt(from);
+                        const toId = parseInt(to);
+                        if (nodeSet.has(fromId) && nodeSet.has(toId)) {
+                            edges.push({
+                                from: fromId,
+                                to: toId,
+                                arrows: isDirected ? 'to' : '',
+                                color: { color: 'black' },
+                                width: 2
+                            });
+                        }
+                    }
+                });
+
+                const data = {
+                    nodes: new vis.DataSet(nodes),
+                    edges: new vis.DataSet(edges)
+                };
+
+                const options = {
+                    nodes: {
+                        shapeProperties: {
+                            useBorderWithImage: true
+                        }
+                    },
+                    physics: {
+                        enabled: true,
+                        stabilization: {
+                            enabled: true,
+                            iterations: 500,
+                            updateInterval: 25,
+                            onlyDynamicEdges: false,
+                            fit: true
+                        },
+                        solver: 'forceAtlas2Based',
+                        forceAtlas2Based: {
+                            gravitationalConstant: -10,
+                            centralGravity: 0.001,
+                            springLength: 0.2 * radius * 1.5 * Math.sin(Math.PI / nodeCount),
+                            springConstant: 0.02,
+                            damping: 0.05,
+                            avoidOverlap: 0.2
+                        },
+                        timestep: 0.05
+                    }
+                };
+
+                if (network) {
+                    network.destroy();
+                }
+                network = new vis.Network(graphContainer, data, options);
+
+                network.once('stabilized', function () {
+                    // 获取第一个节点的 ID
+                    const firstNodeId = nodes[0].id;
+                    // 获取节点的初始位置
+                    const initialPosition = network.getPositions([firstNodeId])[firstNodeId];
+                    // 模拟拖动操作，将节点稍微移动一点
+                    const newX = initialPosition.x + 10;
+                    const newY = initialPosition.y + 10;
+                    network.moveNode(firstNodeId, newX, newY);
+                    // 释放节点，触发物理模拟
+                    setTimeout(() => {
+                        network.moveNode(firstNodeId, initialPosition.x, initialPosition.y);
+                    }, 200);
+                });
+
+                // 监听节点拖动开始事件
+                network.on('dragStart', function () {
+                    // 可以在这里添加一些提示信息，比如显示正在调整的提示
+                });
+
+                // 监听节点拖动结束事件，开始平衡模式
+                network.on('dragEnd', function () {
+                    network.stabilize();
+                });
+            };
+
+            drawDirectedButton.addEventListener('click', function () {
+                drawGraph(true);
+            });
+
+            drawUndirectedButton.addEventListener('click', function () {
+                drawGraph(false);
+            });
+
+            // 绘制默认的无向图
+            nodeCountInput.value = 6;
+            input.value = "0 1\n1 2\n2 3\n3 4\n4 5\n5 0";
+            drawGraph(false);
+        });
+    </script>
+</body>
+
+</html>
